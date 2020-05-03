@@ -1,2 +1,2 @@
 # DRX_CA
-C++ codebase of cellular Automata based Dynamic Recrystallization
+C++ codebase of cellular Automata based Dynamic Recrystallization (Under Development)
