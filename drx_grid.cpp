@@ -30,11 +30,11 @@ int _grid_::check_neighbours(int i, int j) {
             nx = i + x - 1;
             ny = j + y - 1;
             if (this -> cell[i][j].grain_number != this -> cell[nx][ny].grain_number) {
-                return nx * pow(10, 2 * encoder + 1) + ny * pow(10, encoder + 1) + 1;
+                return nx * pow(10, encoder + 1) + ny * pow(10, 1) + 1;
             }
         }
     }
-    return nx * pow(10, 2 * encoder) + ny * pow(10, encoder) + 0;
+    return 0;
 }
 
 void _grid_::monteCarloInit(grain_cell mat[GRID_SIZE][GRID_SIZE]) {
@@ -203,35 +203,16 @@ float _grid_::calculate_velocities() {
 
     ff(i, 0, GRID_SIZE) {
         ff(j, 0, GRID_SIZE) {
-            on_border = 0;
-            x = y = 0;
-            nx = ny = 0;
-            x_start = y_start = 0;
-            x_end = y_end = 3;
-            if (i == 0) x_start++;
-            if (j == 0) y_start++;
-            if (i == GRID_SIZE - 1) x_end--;
-            if (j == GRID_SIZE - 1) y_end--;
-            for (x = x_start; x < x_end; x++) {
-                for (y = y_start; y < y_end; y++) {
-                    if (i == x && j == y) continue;
-                    nx = i + x - 1;
-                    ny = j + y - 1;
-                    if (this -> cell[i][j].grain_number != this -> cell[nx][ny].grain_number) {
-                        on_border = 1;
-                        break;
-                    }
-                }
-                if (on_border == 1) {
-                    break;
-                }
-            }
+            neighbour_info = 0;
+            
             neighbour_info = this -> check_neighbours(i, j);
 
-            if (neighbour_info % 2 == 1) {
-                // nx = (int)(neighbour_info / pow(10, 2 * encoder + 1));
-                // ny = (int)(neighbour_info / pow(10, encoder + 1));
-                cout << "For " << nx << " and " << ny << ": " << (int)(neighbour_info / pow(10, 2 * encoder + 1)) << endl;
+            if (neighbour_info != 0) {
+                cout << neighbour_info << endl;
+                nx = (int)(neighbour_info / pow(10, encoder + 1));
+                neighbour_info = neighbour_info % (int)pow(10, encoder + 1);
+                ny = (int)neighbour_info / 10;
+                // cout << "For " << nx << " and " << ny << endl;
                 misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation) * M_PI / 180;
                 cell_gamma = gamma_m * sin(2 * misorientation) * (1 - r_gamma * log(sin(2 * misorientation)));
                 // cell_gamma = gamma_l(misorientation * 180 / M_PI);
@@ -288,9 +269,9 @@ void _grid_::saturate_grain(int i, int j, int parent_grain_count, int parent_gra
     this -> grain_num[i][j] = parent_grain_count;
     this -> grain_size_nc[parent_grain_count]++;
 
+    int nx = 0, ny = 0;
     int x = 0, y = 0;
     int x_start = 0, x_end = 3, y_start = 0, y_end = 3;
-    int nx = 0, ny = 0;
     x = y = 0;
     nx = ny = 0;
     x_start = y_start = 0;
