@@ -5,8 +5,8 @@
 
 using namespace std;
 
-#define STATES 50
-#define GRID_SIZE 20
+#define STATES 180
+#define GRID_SIZE 200
 #define ITERATIONS_MC 1000000
 #define MAX_ORIENTATION 90.0
 #define DIS_DEN_MEAN 1.0e11
