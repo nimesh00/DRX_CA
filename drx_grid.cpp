@@ -26,9 +26,9 @@ int _grid_::check_neighbours(int i, int j) {
     if (j == GRID_SIZE - 1) y_end--;
     for (x = x_start; x < x_end; x++) {
         for (y = y_start; y < y_end; y++) {
-            if (i == x && j == y) continue;
             nx = i + x - 1;
             ny = j + y - 1;
+            if (i == x && j == y) continue;
             if (this -> cell[i][j].grain_number != this -> cell[nx][ny].grain_number) {
                 return nx * pow(10, encoder + 1) + ny * pow(10, 1) + 1;
             }
@@ -188,6 +188,19 @@ void _grid_::monteCarloInit(grain_cell mat[GRID_SIZE][GRID_SIZE]) {
 
 }
 
+float _grid_::calculate_cell_velocity(float delta_p, float misorientation, float grain_size) {
+    int nx = 0, ny = 0;
+    float cell_gamma = 0;
+    float P = 0;
+
+    cell_gamma = gamma_m * sin(2 * misorientation * M_PI / 180) * (1 - r_gamma * log(sin(2 * misorientation * M_PI / 180)));
+    
+    M = mobility(misorientation);
+    P = abs(tau * delta_p - 2 * cell_gamma / grain_size); // In Liu & Hallberg
+
+    return M * P;
+}
+
 float _grid_::calculate_velocities() {
     int x = 0, y = 0;
     int nx = 0, ny = 0;
@@ -208,17 +221,17 @@ float _grid_::calculate_velocities() {
             neighbour_info = this -> check_neighbours(i, j);
 
             if (neighbour_info != 0) {
-                cout << neighbour_info << endl;
+                // cout << neighbour_info << endl;
                 nx = (int)(neighbour_info / pow(10, encoder + 1));
                 neighbour_info = neighbour_info % (int)pow(10, encoder + 1);
                 ny = (int)neighbour_info / 10;
                 // cout << "For " << nx << " and " << ny << endl;
-                misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation) * M_PI / 180;
-                cell_gamma = gamma_m * sin(2 * misorientation) * (1 - r_gamma * log(sin(2 * misorientation)));
-                // cell_gamma = gamma_l(misorientation * 180 / M_PI);
+                misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation);
+                cell_gamma = gamma_m * sin(2 * misorientation * M_PI / 180) * (1 - r_gamma * log(sin(2 * misorientation * M_PI / 180)));
+                // cell_gamma = gamma_l(misorientation);
                 delta_p = abs(this -> cell[i][j].dislocation_density - this -> cell[nx][ny].dislocation_density);
                 grain_size = sqrt(this -> grain_size_nc[this -> grain_num[i][j]] * CELL_SIZE * CELL_SIZE / M_PI);
-                M = mobility(misorientation * 180 / M_PI);
+                M = mobility(misorientation);
                 P = abs(tau * delta_p - 2 * cell_gamma / grain_size); // In Liu & Hallberg
                 // P = tau * delta_p; // In Popova
                 // cout << "cell gamma: " << cell_gamma << endl;
@@ -243,13 +256,15 @@ float _grid_::calculate_velocities() {
             }
         }
     }
-    cout << "Finished Calculating Velocities!!\n";
+    // cout << "Finished Calculating Velocities!!\n";
     return v_max;
 }
 
 void _grid_::reset_grain_variables() {
+    this -> grain_size_nc.clear();
+    grain_size_nc = {0};
     ff(i, 0, GRID_SIZE) {
-        // this -> grain_size_nc[i] = 0;
+        // this -> grain_size_nc[i % STATES] = 0;
         ff(j, 0, GRID_SIZE) {
             this -> grain_num[i][j] = 0;
         }
@@ -343,6 +358,23 @@ void _grid_::average_p() {
     this -> p_avg = total_p / (float)(GRID_SIZE * GRID_SIZE);
 }
 
+void deep_copy_grid(_grid_ from, _grid_ to) {
+    ff(i, 0, GRID_SIZE) {
+        ff(j, 0, GRID_SIZE) {
+            to.cell[i][j].orientation = from.cell[i][j].orientation;
+            to.cell[i][j].N_recrystallized = from.cell[i][j].N_recrystallized;
+            to.cell[i][j].grain_number = from.cell[i][j].grain_number;
+            to.cell[i][j].gb_disp = from.cell[i][j].gb_disp;
+            to.cell[i][j].dislocation_density = from.cell[i][j].dislocation_density;
+            to.cell[i][j].gb_velocity = from.cell[i][j].gb_velocity;
+            to.grain_num[i][j] = from.grain_num[i][j];
+        }
+    }
+    to.grain_size_nc = from.grain_size_nc;
+    to.v_max = from.v_max;
+    to.p_max = from.p_max;
+    to.p_avg = from.p_avg;
+}
 
 void write_to_file(grain_cell array[GRID_SIZE][GRID_SIZE]) {
     // writing the file to be compatible with GNUPLOT (1st row and column are the axes values)

@@ -50,7 +50,7 @@ class _grid_ {
     void set_grain_numbers();
     void saturate_grain(int, int, int, int, bool);
     int check_neighbours(int, int);
-    void calculate_cell_velocity(int, int);
+    float calculate_cell_velocity(float, float, float);
 
     _grid_() {
         encoder = 0;
@@ -62,11 +62,12 @@ class _grid_ {
         set_grain_numbers();
         this -> v_max = calculate_velocities();
         average_p();
-        cout << "Maximum Grain Velocity: " << this -> v_max << "\n";
+        std::cout << "Maximum Grain Velocity: " << this -> v_max << "\n";
     }
 
 };
 
+void deep_copy_grid(_grid_, _grid_);
 void write_to_file(grain_cell array[GRID_SIZE][GRID_SIZE]);
 
 #endif
