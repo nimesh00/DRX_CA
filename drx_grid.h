@@ -51,6 +51,9 @@ class _grid_ {
     void saturate_grain(int, int, int, int, bool);
     int check_neighbours(int, int);
     float calculate_cell_velocity(float, float, float);
+    bool consume_recrystallized_nuclei(int, int, int, int);
+    bool propagate_grain_boundary(int, int, int, _grid_*);
+    bool potential_nucleus(int, int);
 
     _grid_() {
         encoder = 0;
@@ -67,7 +70,7 @@ class _grid_ {
 
 };
 
-void deep_copy_grid(_grid_, _grid_);
+void deep_copy_grid(_grid_*, _grid_*);
 void write_to_file(grain_cell array[GRID_SIZE][GRID_SIZE]);
 
 #endif

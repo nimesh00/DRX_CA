@@ -8,7 +8,7 @@ void grain_cell::nucleate() {
     this -> dislocation_density = 0;
     this -> N_recrystallized = 1;
     this -> grain_number = rand() % STATES + 1;
-    this -> orientation = (rand() / RAND_MAX) * MAX_ORIENTATION;
+    this -> orientation = ((float)rand() / (float)RAND_MAX) * (float)MAX_ORIENTATION;
 }
 
 void grain_cell::update_dislocation_density(float delta_str) {
@@ -39,7 +39,8 @@ int _grid_::check_neighbours(int i, int j) {
 
 void _grid_::monteCarloInit(grain_cell mat[GRID_SIZE][GRID_SIZE]) {
     int i, j;
-    int* arr = (int*)malloc(sizeof(int) * STATES);
+    // int* arr = (int*)malloc(sizeof(int) * STATES);
+    int arr[STATES];
     int index = 0, temp_max = 0;
     int not_similar_i = 0, not_similar_f = 0, delta = 0;
     float prob, r_no;
@@ -297,7 +298,7 @@ void _grid_::saturate_grain(int i, int j, int parent_grain_count, int parent_gra
     if (j == GRID_SIZE - 1) y_end--;
     for (x = x_start; x < x_end; x++) {
         for (y = y_start; y < y_end; y++) {
-            if (i == x && j == y) continue;
+            if (i == nx && j == ny) continue;
             nx = i + x - 1;
             ny = j + y - 1;
             saturate_grain(nx, ny, parent_grain_count, parent_grain_number, 0);
@@ -358,22 +359,153 @@ void _grid_::average_p() {
     this -> p_avg = total_p / (float)(GRID_SIZE * GRID_SIZE);
 }
 
-void deep_copy_grid(_grid_ from, _grid_ to) {
-    ff(i, 0, GRID_SIZE) {
-        ff(j, 0, GRID_SIZE) {
-            to.cell[i][j].orientation = from.cell[i][j].orientation;
-            to.cell[i][j].N_recrystallized = from.cell[i][j].N_recrystallized;
-            to.cell[i][j].grain_number = from.cell[i][j].grain_number;
-            to.cell[i][j].gb_disp = from.cell[i][j].gb_disp;
-            to.cell[i][j].dislocation_density = from.cell[i][j].dislocation_density;
-            to.cell[i][j].gb_velocity = from.cell[i][j].gb_velocity;
-            to.grain_num[i][j] = from.grain_num[i][j];
+bool _grid_::potential_nucleus(int i, int j) {
+    if (this -> cell[i][j].N_recrystallized == 1) {
+        return 0;
+    }
+    int neighbour_info = 0;
+    int nx = 0, ny = 0;
+    float misorientation = 0;
+    float cell_gamma = 0;
+    neighbour_info = this -> check_neighbours(i, j);
+    if (neighbour_info != 0) {
+        nx = (int)(neighbour_info / pow(10, encoder + 1));
+        neighbour_info = neighbour_info % (int)pow(10, encoder + 1);
+        ny = (int)neighbour_info / 10;
+        misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation);
+        cell_gamma = gamma_m * sin(2 * misorientation * M_PI / 180) * (1 - r_gamma * log(sin(2 * misorientation * M_PI / 180)));
+        M = mobility(misorientation);
+        p_ciritcal = pow((20 * cell_gamma * EPS_RATE) / (3 * b * sqrt(this -> cell[i][j].dislocation_density) * M * tau * tau), 1.0 / 3.0);
+        if (misorientation > CRITICAL_MISORIENTATION && this -> cell[i][j].dislocation_density > p_ciritcal) {
+            return 1;
         }
     }
-    to.grain_size_nc = from.grain_size_nc;
-    to.v_max = from.v_max;
-    to.p_max = from.p_max;
-    to.p_avg = from.p_avg;
+    return 0;
+}
+
+bool _grid_::consume_recrystallized_nuclei(int i, int j, int p_i, int p_j) {
+    int nx = 0, ny = 0;
+    int x = 0, y = 0;
+    int x_start = 0, x_end = 3, y_start = 0, y_end = 3;
+
+    int not_similar_i = 0;
+    int not_similar_f = 0;
+    int delta = 0;
+
+    if (i == 0) x_start++;
+    if (j == 0) y_start++;
+    if (i == GRID_SIZE - 1) x_end--;
+    if (j == GRID_SIZE - 1) y_end--;
+    for (x = x_start; x < x_end; x++) {
+        for (y = y_start; y < y_end; y++) {
+            if (i == nx && j == ny) continue;
+
+            if (this -> cell[i][j].grain_number != this -> cell[nx][ny].grain_number) {
+                not_similar_i++;
+            }
+
+            if (this -> cell[p_i][p_j].grain_number != this -> cell[nx][ny].grain_number) {
+                not_similar_f++;
+            }
+        }
+    }
+
+    delta = not_similar_f - not_similar_i;
+    // if (delta < 0) {
+    //     return 1;
+    // } else {
+    //     return 0;
+    // }
+    if (not_similar_i == (x_end - x_start) * (y_end - y_start) - 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+bool _grid_::propagate_grain_boundary(int i, int j, int k, _grid_ *update_grid) {
+    int nx = 0, ny = 0;
+    int x = 0, y = 0;
+    int x_start = 0, x_end = 3, y_start = 0, y_end = 3;
+
+    float misorientation = 0;
+    float delta_p = 0;
+    float grain_size = 0;
+    float gb_vel = 0;
+
+    float p_random = 0;
+    float p_growth = 0;
+
+    bool propagated = 0;
+
+    bool iter = k % 2;
+
+    if (i == 0) x_start++;
+    if (j == 0) y_start++;
+    if (i == GRID_SIZE - 1) x_end--;
+    if (j == GRID_SIZE - 1) y_end--;
+    for (x = x_start; x < x_end; x++) {
+        for (y = y_start; y < y_end; y++) {
+            if (i == nx && j == ny) continue;
+            if ((x == x_start && y == y_start) || (x == x_end - 1 && y == y_end - 1)) {
+                if (k % 2 == 1) continue;
+            }
+            if ((x == x_start && y == y_end - 1) || (x == x_end - 1 && y == y_start)) {
+                if (k % 2 == 0) continue;
+            }
+            nx = i + x - 1;
+            ny = j + y - 1;
+            if (this -> cell[nx][ny].N_recrystallized == 1) {
+                if (this -> cell[i][j].orientation == this -> cell[nx][ny].orientation) continue;
+                if (consume_recrystallized_nuclei(nx, ny, i, j)) {
+                    cout << "Nuclei Eaten!!\n";
+                    update_grid -> cell[nx][ny].grain_number = this -> cell[i][j].grain_number;
+                    update_grid -> cell[nx][ny].dislocation_density = this -> cell[i][j].dislocation_density;
+                    update_grid -> cell[nx][ny].N_recrystallized = 1;
+                    update_grid -> cell[nx][ny].orientation = this -> cell[i][j].orientation;
+                    propagated = 1;
+                }
+
+            } else {
+            // if (this -> cell[nx][ny].N_recrystallized == 0) {
+                misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation);
+                delta_p = abs(this -> cell[i][j].dislocation_density - this -> cell[nx][ny].dislocation_density);
+                grain_size = sqrt(this -> grain_size_nc[this -> grain_num[i][j]] * CELL_SIZE * CELL_SIZE / M_PI);
+                gb_vel = this -> calculate_cell_velocity(delta_p, misorientation, grain_size);
+                if (gb_vel > update_grid -> v_max) {
+                    update_grid -> v_max = gb_vel;
+                }
+                p_growth = gb_vel / this -> v_max;
+                p_random = (float)rand() / (float)RAND_MAX;
+                if (p_random < p_growth) {
+                    update_grid -> cell[nx][ny].grain_number = this -> cell[i][j].grain_number;
+                    update_grid -> cell[nx][ny].dislocation_density = this -> cell[i][j].dislocation_density;
+                    update_grid -> cell[nx][ny].N_recrystallized = 1;
+                    update_grid -> cell[nx][ny].orientation = this -> cell[i][j].orientation;
+                    propagated = 1;
+                }
+            }
+        }
+    }
+    return propagated;
+}
+
+void deep_copy_grid(_grid_ *from, _grid_ *to) {
+    ff(i, 0, GRID_SIZE) {
+        ff(j, 0, GRID_SIZE) {
+            to -> cell[i][j].orientation = from -> cell[i][j].orientation;
+            to -> cell[i][j].N_recrystallized = from -> cell[i][j].N_recrystallized;
+            to -> cell[i][j].grain_number = from -> cell[i][j].grain_number;
+            to -> cell[i][j].gb_disp = from -> cell[i][j].gb_disp;
+            to -> cell[i][j].dislocation_density = from ->cell[i][j].dislocation_density;
+            to -> cell[i][j].gb_velocity = from -> cell[i][j].gb_velocity;
+            to -> grain_num[i][j] = from -> grain_num[i][j];
+        }
+    }
+    to -> grain_size_nc = from -> grain_size_nc;
+    to -> v_max = from -> v_max;
+    to -> p_max = from -> p_max;
+    to -> p_avg = from -> p_avg;
 }
 
 void write_to_file(grain_cell array[GRID_SIZE][GRID_SIZE]) {
