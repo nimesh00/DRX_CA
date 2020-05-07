@@ -5,7 +5,7 @@
 #include <fstream>
 
 void grain_cell::nucleate() {
-    this -> dislocation_density = 0;
+    this -> dislocation_density = DIS_DEN_RESET;
     this -> N_recrystallized = 1;
     this -> grain_number = rand() % STATES + 1;
     this -> orientation = ((float)rand() / (float)RAND_MAX) * (float)MAX_ORIENTATION;
@@ -13,7 +13,10 @@ void grain_cell::nucleate() {
 
 void grain_cell::update_dislocation_density(float delta_str) {
     float delta_p = (k1 * sqrt(this -> dislocation_density) - k2 * (this -> dislocation_density)) * delta_str;
-    this -> dislocation_density += delta_p;
+    if (this -> dislocation_density + delta_p <= DIS_DEN_MAX) {
+        this -> dislocation_density += delta_p;
+    }
+       // this -> dislocation_density += delta_p;
 }
 
 int _grid_::check_neighbours(int i, int j) {
@@ -235,15 +238,6 @@ float _grid_::calculate_velocities() {
                 M = mobility(misorientation);
                 P = abs(tau * delta_p - 2 * cell_gamma / grain_size); // In Liu & Hallberg
                 // P = tau * delta_p; // In Popova
-                // cout << "cell gamma: " << cell_gamma << endl;
-                // cout << "tau : " << tau << endl;
-                // cout << "delta_p: " << delta_p << endl;
-                // cout << "2 * gamma / r: " << 2 * cell_gamma / grain_size << endl;
-                // cout << "grain size : " << grain_size << "\n";
-                // cout << "P: " << P << "\n";
-                // cout << "M: " << M << endl;
-                // cout << "Between grian " << this -> grain_num[i][j] << " & " << this -> grain_num[nx][ny] << " : " << misorientation * 180 / M_PI << "\n";
-                // cout << "V: " << M * P << "\n";
 
                 // p_ciritcal = pow((20 * cell_gamma * EPS_RATE) / (3 * b * sqrt(this -> cell[i][j].dislocation_density) * M * tau * tau), 1.0 / 3.0);
                 // cout << "critical p: " << p_ciritcal << endl;
@@ -356,7 +350,7 @@ void _grid_::average_p() {
             total_p += this -> cell[i][j].dislocation_density;
         }
     }
-    this -> p_avg = total_p / (float)(GRID_SIZE * GRID_SIZE);
+    this -> p_avg = (float)total_p / (float)(GRID_SIZE * GRID_SIZE);
 }
 
 bool _grid_::potential_nucleus(int i, int j) {
@@ -398,8 +392,9 @@ bool _grid_::consume_recrystallized_nuclei(int i, int j, int p_i, int p_j) {
     if (j == GRID_SIZE - 1) y_end--;
     for (x = x_start; x < x_end; x++) {
         for (y = y_start; y < y_end; y++) {
+            nx = i + x - 1;
+            ny = j + y - 1;
             if (i == nx && j == ny) continue;
-
             if (this -> cell[i][j].grain_number != this -> cell[nx][ny].grain_number) {
                 not_similar_i++;
             }
@@ -411,16 +406,17 @@ bool _grid_::consume_recrystallized_nuclei(int i, int j, int p_i, int p_j) {
     }
 
     delta = not_similar_f - not_similar_i;
-    // if (delta < 0) {
-    //     return 1;
-    // } else {
-    //     return 0;
-    // }
-    if (not_similar_i == (x_end - x_start) * (y_end - y_start) - 1) {
+    // cout << "delta: " << delta << endl;
+    if (delta < 0) {
         return 1;
     } else {
         return 0;
     }
+    // if (not_similar_i == (x_end - x_start) * (y_end - y_start) - 1) {
+    //     return 1;
+    // } else {
+    //     return 0;
+    // }
 }
 
 bool _grid_::propagate_grain_boundary(int i, int j, int k, _grid_ *update_grid) {
@@ -438,14 +434,14 @@ bool _grid_::propagate_grain_boundary(int i, int j, int k, _grid_ *update_grid) 
 
     bool propagated = 0;
 
-    bool iter = k % 2;
-
     if (i == 0) x_start++;
     if (j == 0) y_start++;
     if (i == GRID_SIZE - 1) x_end--;
     if (j == GRID_SIZE - 1) y_end--;
     for (x = x_start; x < x_end; x++) {
         for (y = y_start; y < y_end; y++) {
+            nx = i + x - 1;
+            ny = j + y - 1;
             if (i == nx && j == ny) continue;
             if ((x == x_start && y == y_start) || (x == x_end - 1 && y == y_end - 1)) {
                 if (k % 2 == 1) continue;
@@ -453,12 +449,9 @@ bool _grid_::propagate_grain_boundary(int i, int j, int k, _grid_ *update_grid) 
             if ((x == x_start && y == y_end - 1) || (x == x_end - 1 && y == y_start)) {
                 if (k % 2 == 0) continue;
             }
-            nx = i + x - 1;
-            ny = j + y - 1;
             if (this -> cell[nx][ny].N_recrystallized == 1) {
-                if (this -> cell[i][j].orientation == this -> cell[nx][ny].orientation) continue;
+                if (this -> cell[i][j].grain_number == this -> cell[nx][ny].grain_number) continue;
                 if (consume_recrystallized_nuclei(nx, ny, i, j)) {
-                    cout << "Nuclei Eaten!!\n";
                     update_grid -> cell[nx][ny].grain_number = this -> cell[i][j].grain_number;
                     update_grid -> cell[nx][ny].dislocation_density = this -> cell[i][j].dislocation_density;
                     update_grid -> cell[nx][ny].N_recrystallized = 1;
@@ -477,7 +470,9 @@ bool _grid_::propagate_grain_boundary(int i, int j, int k, _grid_ *update_grid) 
                 }
                 p_growth = gb_vel / this -> v_max;
                 p_random = (float)rand() / (float)RAND_MAX;
-                if (p_random < p_growth) {
+                // The function in the second contition is used here because it does not demand any of the cells
+                // to be already nucleated. The name suggests that the nuclei to be consumed should be already nucleated but the implementation does not demand that.
+                if (p_random < p_growth || consume_recrystallized_nuclei(nx, ny, i, j)) {
                     update_grid -> cell[nx][ny].grain_number = this -> cell[i][j].grain_number;
                     update_grid -> cell[nx][ny].dislocation_density = this -> cell[i][j].dislocation_density;
                     update_grid -> cell[nx][ny].N_recrystallized = 1;

@@ -40,7 +40,7 @@ class _grid_ {
     int grain_num[GRID_SIZE][GRID_SIZE];
     float v_max = 0;
     float p_max = 0;
-    float p_avg = 0;
+    double p_avg = 0;
     vector<int> grain_size_nc;
 
     void monteCarloInit(grain_cell array[GRID_SIZE][GRID_SIZE]);
