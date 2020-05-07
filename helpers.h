@@ -5,15 +5,20 @@
 
 using namespace std;
 
-#define STATES 180
+#define STATES 50
 #define GRID_SIZE 200
 #define ITERATIONS_MC 1000000
 #define MAX_ORIENTATION 90.0
-#define DIS_DEN_MEAN 1.0e11
-#define DIS_DEN_STD_DEV 1.0e10
+
+#define DIS_DEN_MEAN 8.0e11
+#define DIS_DEN_STD_DEV 1.0e11
+#define DIS_DEN_RESET 2.022e14
+#define DIS_DEN_CRITICAL 8.08e14
+#define DIS_DEN_MAX 8.08e14
+
 #define CELL_SIZE 2.0e-6
 #define CRITICAL_MISORIENTATION 15 // degrees
-#define EPS_CR 0.4
+#define EPS_CR 0.22
 #define EPS_FINAL 1.5
 #define EPS_RATE 0.01
 #define T 725.0 // K
@@ -29,10 +34,10 @@ using namespace std;
 #define alpha 0.5
 #define b 2.56e-10 // m
 #define nu 0.3 // poisson's ratio
-#define mu_o 3e10 // Pa -- As in Hallberg
-// #define mu_o 7.89e10 // Pa -- As in Liu
-#define k1 7.8e8
-#define k2 24.1
+// #define mu_o 3e10 // Pa -- As in Hallberg
+#define mu_o 7.89e10 // Pa -- As in Liu
+#define k1 4.78e8
+#define k2 27.09
 #define ff(i, s, e) for (int i = s; i < e; i++)
 #define fb(i, e, s) for (int i = e; i >= s; i--)
 
