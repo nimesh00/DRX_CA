@@ -369,7 +369,7 @@ bool _grid_::potential_nucleus(int i, int j) {
         misorientation = abs(this -> cell[i][j].orientation - this -> cell[nx][ny].orientation);
         cell_gamma = gamma_m * sin(2 * misorientation * M_PI / 180) * (1 - r_gamma * log(sin(2 * misorientation * M_PI / 180)));
         M = mobility(misorientation);
-        p_ciritcal = pow((20 * cell_gamma * EPS_RATE) / (3 * b * sqrt(this -> cell[i][j].dislocation_density) * M * tau * tau), 1.0 / 3.0);
+        p_ciritcal = pow((20 * cell_gamma * EPS_RATE) / (3 * BURGERS_B * sqrt(this -> cell[i][j].dislocation_density) * M * tau * tau), 1.0 / 3.0);
         if (misorientation > CRITICAL_MISORIENTATION && this -> cell[i][j].dislocation_density > p_ciritcal) {
             return 1;
         }

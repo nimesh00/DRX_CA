@@ -1,0 +1,5 @@
+build/
+drx
+*.o
+*.bmp
+drx_frame_*.bmp

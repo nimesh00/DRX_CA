@@ -1,15 +1,28 @@
 #include <iostream>
 #include <random>
 #include <chrono>
+#include <thread>
 #include "helpers.cpp"
 #include "drx_grid.cpp"
+#include "viewer.h"
+
+static void flatten_grain_ids(const grain_cell src[GRID_SIZE][GRID_SIZE], int dst[GRID_SIZE * GRID_SIZE]) {
+    for (int y = 0; y < GRID_SIZE; ++y) {
+        for (int x = 0; x < GRID_SIZE; ++x) {
+            dst[y * GRID_SIZE + x] = src[y][x].grain_number;
+        }
+    }
+}
 
 int main() {
-    // Invoking GnuPlot in the background.
-    system("gnuplot cadrx.gp &");
-
     // seeding random number initialization with current time
     srand((unsigned)time(0));
+
+    if (!viewer::init(GRID_SIZE)) {
+        std::cerr << "Failed to start viewer — exiting." << std::endl;
+        return 1;
+    }
+    static int frame_buf[GRID_SIZE * GRID_SIZE];
 
     _grid_ grid;
     _grid_ u_grid;
@@ -52,6 +65,8 @@ int main() {
     int i = 0, j = 0;
 
     write_to_file(grid.cell);
+    flatten_grain_ids(grid.cell, frame_buf);
+    viewer::render(frame_buf, GRID_SIZE, 0, 0.0, grid.p_avg);
 
     while (eps < EPS_FINAL) {
         cout << "Iteration: " << ++iteration << endl;
@@ -196,9 +211,25 @@ int main() {
         potential_nucleus_x.clear();
         potential_nucleus_y.clear();
         deep_copy_grid(&u_grid, &grid);
-        // write_to_file(grid.cell);
+
+        if (iteration % RENDER_EVERY == 0) {
+            flatten_grain_ids(grid.cell, frame_buf);
+            if (!viewer::render(frame_buf, GRID_SIZE, iteration, eps, grid.p_avg)) {
+                std::cout << "Viewer closed — stopping simulation." << std::endl;
+                break;
+            }
+            if (RENDER_DELAY_MS > 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(RENDER_DELAY_MS));
+            }
+        }
     }
     write_to_file(grid.cell);
+    flatten_grain_ids(grid.cell, frame_buf);
+    std::cout << "Simulation complete. Close the window or press q/Esc to exit." << std::endl;
+    while (viewer::render(frame_buf, GRID_SIZE, iteration, eps, grid.p_avg)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    viewer::shutdown();
 
     return 0;
 }

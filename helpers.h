@@ -32,12 +32,21 @@ using namespace std;
 #define Qm 126e3 // J-mol^-1
 #define Qn 261e3 // J-mol^-1
 #define alpha 0.5
-#define b 2.56e-10 // m
+#define BURGERS_B 2.56e-10 // m (Burgers vector magnitude)
 #define nu 0.3 // poisson's ratio
 // #define mu_o 3e10 // Pa -- As in Hallberg
 #define mu_o 7.89e10 // Pa -- As in Liu
 #define k1 4.78e8
 #define k2 27.09
+
+// Visualization controls
+// RENDER_EVERY: write grid.dat (and therefore refresh the gnuplot view) every N iterations.
+//               Larger values = faster simulation, less smooth animation. Use 1 to render every step.
+// RENDER_DELAY_MS: extra wall-clock delay (ms) after each write, to slow the animation down so it is easy to watch.
+//                  Set to 0 to render as fast as possible.
+#define RENDER_EVERY 1
+#define RENDER_DELAY_MS 50
+
 #define ff(i, s, e) for (int i = s; i < e; i++)
 #define fb(i, e, s) for (int i = e; i >= s; i--)
 
@@ -45,8 +54,8 @@ using namespace std;
 float nucleation_rate = C * EPS_RATE * exp(-Qn / (R * T));
 float M = Mo * exp(-1 * Qm / (R * T));
 float mu = mu_o * (1 - 0.5 * (T - 300.0) / (Tm));
-float gamma_o = (mu * b * CRITICAL_MISORIENTATION) / (4 * M_PI * (1 - nu));
-float tau = 0.5 * mu * b * b;
+float gamma_o = (mu * BURGERS_B * CRITICAL_MISORIENTATION) / (4 * M_PI * (1 - nu));
+float tau = 0.5 * mu * BURGERS_B * BURGERS_B;
 float p_ciritcal = DIS_DEN_MEAN;
 
 int encoder = 0;
