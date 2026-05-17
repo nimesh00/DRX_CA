@@ -2,7 +2,7 @@
 
 A C++ implementation of **Cellular Automata–based Dynamic Recrystallization (DRX)** simulation. The simulation models grain nucleation, growth, and dislocation-density evolution on a 2D grid under a constant strain rate. A built-in SDL2 window renders the evolving microstructure live as the simulation runs — no external viewer or visualization tool required.
 
-> Status: **Under active development.**
+> Status: **NOT Under active development.**
 
 ---
 
